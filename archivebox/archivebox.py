@@ -27,7 +27,7 @@ class ArchiveBox(commands.Cog):
     def _get_headers(self, api_key: str) -> dict:
         """Build the Authorization headers for ArchiveBox API requests."""
         return {
-            "Authorization": f"Token {api_key}",
+            "X-ArchiveBox-API-Key": api_key,
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
