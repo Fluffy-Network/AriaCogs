@@ -1,0 +1,26 @@
+{
+    "author": [
+        "Red Cogs"
+    ],
+    "install_msg": "Thanks for installing ScheduledMessage! Use `[p]schedule` or `[p]sm` to get started. Example: `[p]sm #general 0200 Hey Early Birds!` — supports recurring messages, embeds, and role pings!",
+    "name": "ScheduledMessage",
+    "short": "Schedule messages to be sent later",
+    "description": "Schedule one-time or recurring messages to be sent in specific channels at specific times. Supports embeds, role pings, multiple time formats, and persistent storage.",
+    "tags": [
+        "utility",
+        "schedule",
+        "messages",
+        "timer"
+    ],
+    "requirements": [],
+    "hidden": false,
+    "disabled": false,
+    "min_bot_version": "3.5.0",
+    "max_bot_version": "0.0.0",
+    "min_python_version": [
+        3,
+        9,
+        0
+    ],
+    "end_user_data_statement": "This cog stores scheduled message content, target channel IDs, and author IDs for the purpose of delivering messages at the requested time. No personal data is shared with third parties."
+}
