@@ -1,0 +1,27 @@
+{
+    "author": [
+        "Red Cogs"
+    ],
+    "install_msg": "Thanks for installing ArchiveBox! Set your API key with `[p]set api archivebox api_key,<key>` and start archiving with `[p]archive <url>`.",
+    "name": "ArchiveBox",
+    "short": "Submit URLs to ArchiveBox for archiving",
+    "description": "Archive web pages using a self-hosted ArchiveBox instance. Supports API key authentication, status checks, and configurable server URLs.",
+    "tags": [
+        "utility",
+        "archive",
+        "archivebox",
+        "web",
+        "urls"
+    ],
+    "requirements": [],
+    "hidden": false,
+    "disabled": false,
+    "min_bot_version": "3.5.0",
+    "max_bot_version": "0.0.0",
+    "min_python_version": [
+        3,
+        9,
+        0
+    ],
+    "end_user_data_statement": "This cog submits URLs to an external ArchiveBox instance. API credentials are managed via Red's built-in shared API token system. No Discord message content is retained."
+}
