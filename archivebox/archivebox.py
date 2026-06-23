@@ -82,8 +82,8 @@ class ArchiveBox(commands.Cog):
         endpoint = f"{base_url.rstrip('/')}/api/v1/cli/add"
         payload = {
             "urls": [url],
-            "parser": "auto",
-            "tag": "discord-bot"
+            "depth": 0,
+            "max_urls": 0
         }
 
         try:
@@ -160,16 +160,36 @@ class ArchiveBox(commands.Cog):
             ))
             return
 
-        # Parse response
-        if not isinstance(data, list) or len(data) == 0:
+        # Parse response — ArchiveBox may return a dict or a list
+        snapshot = None
+
+        if isinstance(data, list) and len(data) > 0:
+            snapshot = data[0]
+        elif isinstance(data, dict):
+            # Some versions wrap the result in a "result" key
+            if "result" in data and isinstance(data["result"], list) and len(data["result"]) > 0:
+                snapshot = data["result"][0]
+            elif "result" in data and isinstance(data["result"], dict):
+                snapshot = data["result"]
+            else:
+                # The dict itself may be the snapshot
+                snapshot = data
+        else:
             await pending_msg.edit(embed=discord.Embed(
                 title="❌ Unexpected Response",
-                description="ArchiveBox returned an empty or invalid response.",
+                description=f"ArchiveBox returned an empty or unrecognised response.\n```\n{text[:1000]}\n```",
                 color=discord.Color.red()
             ))
             return
 
-        snapshot = data[0]
+        if not isinstance(snapshot, dict):
+            await pending_msg.edit(embed=discord.Embed(
+                title="❌ Unexpected Response",
+                description=f"Could not parse snapshot data from ArchiveBox.\n```\n{text[:1000]}\n```",
+                color=discord.Color.red()
+            ))
+            return
+
         timestamp = snapshot.get("timestamp")
         title = snapshot.get("title") or "Untitled"
         archived_url = snapshot.get("url", url)
