@@ -184,23 +184,29 @@ class ScheduledMessage(commands.Cog):
         text = content.strip()
 
         while True:
-            m = re.match(r'^--(\w+)(?:\s+("[^"]*"|\'[^\']*\'|[^\s]+))?\s*', text)
+            # Match a flag name at the start of the text
+            m = re.match(r'^--(\w+)(?:\s+|\b)', text)
             if not m:
                 break
 
             name = m.group(1).lower()
-            val = m.group(2)
-            if val:
-                val = val.strip('"').strip("'")
-
-            if name in flags:
-                if name in ('daily', 'weekly', 'monthly'):
-                    flags[name] = True
-                else:
-                    flags[name] = val
-                text = text[m.end():]
-            else:
+            if name not in flags:
                 break
+
+            # Consume the flag name (and trailing whitespace)
+            text = text[m.end():].lstrip()
+
+            if name in ('daily', 'weekly', 'monthly'):
+                # Boolean flag — no value to consume
+                flags[name] = True
+            else:
+                # Value flag — capture the next token (quoted or unquoted)
+                vm = re.match(r'(?:"([^"]*)"|\'([^\']*)\'|([^\s]+))', text)
+                if not vm:
+                    break
+                val = vm.group(1) or vm.group(2) or vm.group(3)
+                flags[name] = val
+                text = text[vm.end():].lstrip()
 
         return flags, text.strip()
 
