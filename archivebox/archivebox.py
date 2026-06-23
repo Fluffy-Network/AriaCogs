@@ -45,8 +45,32 @@ class ArchiveBox(commands.Cog):
         """Compare two URLs loosely (strip trailing slashes)."""
         return url1.rstrip("/") == url2.rstrip("/")
 
-    def _extract_results(self, data) -> list:
-        """Extract a list of snapshot dicts from various ArchiveBox response shapes."""
+    def _status_ok(self, status: str | None) -> bool:
+        """Check if an ArchiveBox status means the snapshot is complete."""
+        return status in ("sealed", "succeeded", "verified")
+
+    def _format_tags(self, tags) -> str:
+        """Normalise tags (list or string) to a comma-separated string."""
+        if isinstance(tags, list):
+            return ", ".join(str(t) for t in tags)
+        return str(tags) if tags else ""
+
+    def _build_archive_link(self, base_url: str, snapshot: dict) -> str:
+        """Build a browsable archive link from a snapshot dict."""
+        # ArchiveBox viewer pages are at /archive/<timestamp>/
+        timestamp = snapshot.get("timestamp")
+        if timestamp:
+            return f"{base_url.rstrip('/')}/archive/{timestamp}"
+        # Fallback to archive_path if timestamp is missing
+        archive_path = snapshot.get("archive_path")
+        if archive_path:
+            return f"{base_url.rstrip('/')}/{archive_path}"
+        return base_url
+
+    def _extract_items(self, data) -> list:
+        """Extract the items list from an ArchiveBox paginated response."""
+        if isinstance(data, dict) and "items" in data and isinstance(data["items"], list):
+            return data["items"]
         if isinstance(data, list):
             return data
         if isinstance(data, dict):
@@ -57,7 +81,6 @@ class ArchiveBox(commands.Cog):
                         return val
                     if isinstance(val, dict):
                         return [val]
-            # The dict itself might be a single snapshot
             return [data]
         return []
 
@@ -68,44 +91,32 @@ class ArchiveBox(commands.Cog):
         base_url: str,
         target_url: str
     ) -> dict | None:
-        """Search ArchiveBox for an existing snapshot of target_url."""
-        endpoint = f"{base_url.rstrip('/')}/api/v1/core/snapshot"
+        """Search ArchiveBox for an existing, complete snapshot of target_url."""
+        endpoint = f"{base_url.rstrip('/')}/api/v1/core/snapshots"
         headers = self._get_headers(api_key)
 
-        # Try filtering by URL first (most ArchiveBox versions support this)
-        for param_name in ("url", "filter", "q"):
-            try:
-                async with session.get(
-                    endpoint,
-                    headers=headers,
-                    params={param_name: target_url, "limit": 5},
-                    timeout=aiohttp.ClientTimeout(total=10)
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        for snapshot in self._extract_results(data):
-                            if isinstance(snapshot, dict):
-                                snap_url = snapshot.get("url", "")
-                                if self._urls_match(snap_url, target_url) and snapshot.get("timestamp"):
-                                    return snapshot
-            except Exception:
-                pass
-
-        # Fallback: fetch the most recent snapshots and scan client-side
         try:
             async with session.get(
                 endpoint,
                 headers=headers,
-                params={"limit": 50, "offset": 0},
-                timeout=aiohttp.ClientTimeout(total=10)
+                params={
+                    "url": target_url,
+                    "with_archiveresults": "false",
+                    "limit": 200,
+                    "offset": 0,
+                    "page": 0
+                },
+                timeout=aiohttp.ClientTimeout(total=15)
             ) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    for snapshot in self._extract_results(data):
+                    for snapshot in self._extract_items(data):
                         if isinstance(snapshot, dict):
                             snap_url = snapshot.get("url", "")
-                            if self._urls_match(snap_url, target_url) and snapshot.get("timestamp"):
-                                return snapshot
+                            if self._urls_match(snap_url, target_url):
+                                status = snapshot.get("status", "")
+                                if self._status_ok(status) and snapshot.get("timestamp"):
+                                    return snapshot
         except Exception:
             pass
 
@@ -193,15 +204,14 @@ class ArchiveBox(commands.Cog):
         async with aiohttp.ClientSession() as session:
             # ── 1. Check if the URL is already archived ──
             existing = await self._find_snapshot(session, api_key, base_url, url)
-            if existing and existing.get("timestamp"):
-                timestamp = existing.get("timestamp")
+            if existing:
+                archive_link = self._build_archive_link(base_url, existing)
                 title = existing.get("title")
                 archived_url = existing.get("url", url)
                 status = existing.get("status", "unknown")
-                tags = existing.get("tags", "")
-                archive_link = f"{base_url.rstrip('/')}/archive/{timestamp}"
+                tags = self._format_tags(existing.get("tags"))
 
-                color = discord.Color.green() if status == "succeeded" else discord.Color.blurple()
+                color = discord.Color.green() if self._status_ok(status) else discord.Color.blurple()
 
                 embed = discord.Embed(
                     title="📦 Already Archived",
@@ -308,21 +318,19 @@ class ArchiveBox(commands.Cog):
 
             # ── 3. Parse the immediate response ──
             snapshot = None
-            for snap in self._extract_results(data):
+            for snap in self._extract_items(data):
                 if isinstance(snap, dict):
                     snapshot = snap
                     break
 
-            if snapshot and snapshot.get("timestamp"):
-                # Snapshot was ready immediately
-                timestamp = snapshot.get("timestamp")
+            if snapshot and snapshot.get("timestamp") and self._status_ok(snapshot.get("status")):
+                archive_link = self._build_archive_link(base_url, snapshot)
                 title = snapshot.get("title")
                 archived_url = snapshot.get("url", url)
                 status = snapshot.get("status", "unknown")
-                tags = snapshot.get("tags", "")
-                archive_link = f"{base_url.rstrip('/')}/archive/{timestamp}"
+                tags = self._format_tags(snapshot.get("tags"))
 
-                color = discord.Color.green() if status == "succeeded" else discord.Color.blurple()
+                color = discord.Color.green() if self._status_ok(status) else discord.Color.blurple()
 
                 embed = discord.Embed(
                     title="📦 URL Archived",
@@ -344,15 +352,14 @@ class ArchiveBox(commands.Cog):
                 session, api_key, base_url, url, pending_msg
             )
 
-            if snapshot and snapshot.get("timestamp"):
-                timestamp = snapshot.get("timestamp")
+            if snapshot:
+                archive_link = self._build_archive_link(base_url, snapshot)
                 title = snapshot.get("title")
                 archived_url = snapshot.get("url", url)
                 status = snapshot.get("status", "unknown")
-                tags = snapshot.get("tags", "")
-                archive_link = f"{base_url.rstrip('/')}/archive/{timestamp}"
+                tags = self._format_tags(snapshot.get("tags"))
 
-                color = discord.Color.green() if status == "succeeded" else discord.Color.blurple()
+                color = discord.Color.green() if self._status_ok(status) else discord.Color.blurple()
 
                 embed = discord.Embed(
                     title="📦 URL Archived",
@@ -432,13 +439,14 @@ class ArchiveBox(commands.Cog):
                 f"❌ No API key configured. Use `{ctx.clean_prefix}set api archivebox api_key,<key>` to set one."
             )
 
-        endpoint = f"{base_url.rstrip('/')}/api/v1/core/snapshot"
+        endpoint = f"{base_url.rstrip('/')}/api/v1/core/snapshots"
 
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     endpoint,
                     headers=self._get_headers(api_key),
+                    params={"limit": 1, "offset": 0},
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as resp:
                     if resp.status == 200:
