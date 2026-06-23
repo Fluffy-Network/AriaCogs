@@ -1,3 +1,4 @@
+import asyncio
 import aiohttp
 import discord
 import re
@@ -39,6 +40,68 @@ class ArchiveBox(commands.Cog):
     def _is_valid_url(self, url: str) -> bool:
         """Basic URL validation."""
         return bool(re.match(r"^https?://", url, re.IGNORECASE))
+
+    async def _poll_for_snapshot(
+        self,
+        session: aiohttp.ClientSession,
+        api_key: str,
+        base_url: str,
+        target_url: str,
+        pending_msg: discord.Message,
+        max_wait: int = 90,
+        interval: int = 3
+    ) -> dict | None:
+        """Poll ArchiveBox until the snapshot is ready or we time out."""
+        endpoint = f"{base_url.rstrip('/')}/api/v1/core/snapshot"
+        headers = self._get_headers(api_key)
+        start_time = discord.utils.utcnow()
+
+        while (discord.utils.utcnow() - start_time).total_seconds() < max_wait:
+            await asyncio.sleep(interval)
+
+            try:
+                async with session.get(
+                    endpoint,
+                    headers=headers,
+                    params={"url": target_url, "limit": 1},
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        results = []
+                        if isinstance(data, list):
+                            results = data
+                        elif isinstance(data, dict):
+                            if "results" in data and isinstance(data["results"], list):
+                                results = data["results"]
+                            elif "result" in data and isinstance(data["result"], list):
+                                results = data["result"]
+                            elif "result" in data and isinstance(data["result"], dict):
+                                results = [data["result"]]
+
+                        for snapshot in results:
+                            if isinstance(snapshot, dict) and snapshot.get("timestamp"):
+                                return snapshot
+
+            except Exception:
+                pass
+
+            # Update the pending message so the user knows we're still waiting
+            elapsed = int((discord.utils.utcnow() - start_time).total_seconds())
+            try:
+                embed = discord.Embed(
+                    title="📦 Archiving...",
+                    description=(
+                        f"Submitting `{target_url}` to ArchiveBox...\n"
+                        f"⏳ Waiting for snapshot to be generated... ({elapsed}s)"
+                    ),
+                    color=discord.Color.orange()
+                )
+                await pending_msg.edit(embed=embed)
+            except Exception:
+                pass
+
+        return None
 
     @commands.command(name="archive")
     @commands.mod_or_permissions(manage_messages=True)
@@ -191,18 +254,48 @@ class ArchiveBox(commands.Cog):
             return
 
         timestamp = snapshot.get("timestamp")
-        title = snapshot.get("title") or "Untitled"
+        title = snapshot.get("title")
         archived_url = snapshot.get("url", url)
         status = snapshot.get("status", "unknown")
         tags = snapshot.get("tags", "")
 
-        # Build archive viewer link
-        if timestamp:
-            archive_link = f"{base_url.rstrip('/')}/archive/{timestamp}"
-        else:
-            archive_link = base_url
+        # ArchiveBox processes asynchronously — if there's no timestamp yet,
+        # poll for up to 90 seconds until the snapshot is ready.
+        if not timestamp:
+            async with aiohttp.ClientSession() as poll_session:
+                snapshot = await self._poll_for_snapshot(
+                    poll_session, api_key, base_url, archived_url, pending_msg
+                )
 
-        # Determine color based on status
+            if snapshot and snapshot.get("timestamp"):
+                timestamp = snapshot.get("timestamp")
+                title = snapshot.get("title") or title
+                status = snapshot.get("status", status)
+                tags = snapshot.get("tags", tags)
+            else:
+                # Timed out — still show the queued message
+                embed = discord.Embed(
+                    title="📦 Queued for Archiving",
+                    description=(
+                        f"`{archived_url}` has been submitted to ArchiveBox.\n\n"
+                        f"The snapshot is still being generated in the background. "
+                        f"You can check the archive later at:\n"
+                        f"[ArchiveBox]({base_url})"
+                    ),
+                    color=discord.Color.orange(),
+                    timestamp=discord.utils.utcnow()
+                )
+                embed.add_field(name="Original URL", value=archived_url[:1024], inline=False)
+                if title:
+                    embed.add_field(name="Title", value=title[:1024], inline=False)
+                if status and status != "unknown":
+                    embed.set_footer(text=f"Status: {status.capitalize()}")
+                await pending_msg.edit(embed=embed)
+                return
+
+        # Snapshot is ready — build the archive viewer link
+        archive_link = f"{base_url.rstrip('/')}/archive/{timestamp}"
+
         if status == "succeeded":
             color = discord.Color.green()
         elif status == "failed":
