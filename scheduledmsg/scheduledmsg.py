@@ -81,10 +81,19 @@ class ScheduledMessage(commands.Cog):
                     if channel and isinstance(channel, discord.TextChannel):
                         perms = channel.permissions_for(guild.me)
                         if perms.send_messages:
+                            content = msg["content"]
+
+                            # Extract specific mention IDs from the stored content so Discord
+                            # definitely parses them instead of silently stripping them.
+                            role_ids = [int(r) for r in re.findall(r"<@&(\d+)>", content)]
+                            user_ids = [int(u) for u in re.findall(r"<@!?(\d+)>", content)]
+                            everyone = "@everyone" in content or "@here" in content
+
                             allowed_mentions = discord.AllowedMentions(
-                                everyone=perms.mention_everyone,
-                                roles=True,
-                                users=True
+                                everyone=everyone and perms.mention_everyone,
+                                roles=role_ids or False,
+                                users=user_ids or False,
+                                replied_user=False,
                             )
 
                             if msg.get("embed_title"):
@@ -93,7 +102,7 @@ class ScheduledMessage(commands.Cog):
                                     color = await self.bot.get_embed_color(channel)
                                 embed = discord.Embed(
                                     title=msg["embed_title"],
-                                    description=msg["content"],
+                                    description=content,
                                     color=color
                                 )
                                 try:
@@ -102,7 +111,7 @@ class ScheduledMessage(commands.Cog):
                                     pass
                             else:
                                 try:
-                                    await channel.send(msg["content"], allowed_mentions=allowed_mentions)
+                                    await channel.send(content, allowed_mentions=allowed_mentions)
                                 except discord.HTTPException:
                                     pass
 
