@@ -2,10 +2,10 @@
     "author": [
         "Red Cogs"
     ],
-    "install_msg": "Thanks for installing ArchiveBox! Set your API key with `[p]set api archivebox api_key,<key>` and start archiving with `[p]archive <url>`.",
+    "install_msg": "Thanks for installing ArchiveBox! Set your API key with `[p]set api archivebox api_key,<key>` and start archiving with `[p]archive <url>` or `/archive <url>`.",
     "name": "ArchiveBox",
     "short": "Submit URLs to ArchiveBox for archiving",
-    "description": "Archive web pages using a self-hosted ArchiveBox instance. Supports API key authentication, status checks, and configurable server URLs.",
+    "description": "Archive web pages using a self-hosted ArchiveBox instance. Supports prefix commands, slash commands, API key authentication, status checks, and configurable server URLs.",
     "tags": [
         "utility",
         "archive",

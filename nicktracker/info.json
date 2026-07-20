@@ -1,0 +1,15 @@
+{
+    "author": ["Red Cogs"],
+    "install_msg": "Thanks for installing NicknameTracker! Use `[p]nicktrack @User` or `/nicktrack history` to view nickname history. Tracking is enabled by default.",
+    "name": "NicknameTracker",
+    "short": "Track nickname changes in your server",
+    "description": "Logs every nickname change per user with timestamps. Supports prefix commands and slash commands. Tracks joins, leaves, and rejoins. History is capped at 50 entries per user and persists across bot restarts.",
+    "tags": ["utility", "moderation", "nicknames", "tracking"],
+    "requirements": [],
+    "hidden": false,
+    "disabled": false,
+    "min_bot_version": "3.5.0",
+    "max_bot_version": "0.0.0",
+    "min_python_version": [3, 9, 0],
+    "end_user_data_statement": "This cog stores nickname change history (old nick, new nick, timestamp) per guild. No personal data is shared with third parties."
+}

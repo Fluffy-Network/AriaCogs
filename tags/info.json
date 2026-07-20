@@ -1,0 +1,15 @@
+{
+    "author": ["Red Cogs"],
+    "install_msg": "Thanks for installing Tags! Create your first tag with `[p]tag add <name> <content>` or `/tag add`. Both prefix and slash commands are supported!",
+    "name": "Tags",
+    "short": "Custom command tags for your server",
+    "description": "Create, edit, and manage custom text tags that act like server-specific commands. Supports prefix commands, slash commands, and variables like {user}, {guild}, {date}, etc.",
+    "tags": ["utility", "tags", "custom-commands"],
+    "requirements": [],
+    "hidden": false,
+    "disabled": false,
+    "min_bot_version": "3.5.0",
+    "max_bot_version": "0.0.0",
+    "min_python_version": [3, 9, 0],
+    "end_user_data_statement": "This cog stores tag content, author IDs, and usage counts per guild. No personal data is shared with third parties."
+}
