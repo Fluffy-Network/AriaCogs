@@ -5,7 +5,7 @@
     "install_msg": "Thanks for installing ArchiveBox! Set your API key with `[p]set api archivebox api_key,<key>`. Use `[p]slash enablecog archivebox` and `[p]slash sync` to enable slash commands.",
     "name": "ArchiveBox",
     "short": "Submit URLs to ArchiveBox for archiving",
-    "description": "Archive web pages using a self-hosted ArchiveBox instance. Supports prefix commands, slash commands, API key authentication, status checks, and configurable server URLs.",
+    "description": "Archive web pages using a self-hosted ArchiveBox instance. Supports prefix commands, slash commands, API key authentication, status checks, configurable server URLs, screenshot embeds, and link buttons.",
     "tags": [
         "utility",
         "archive",

@@ -68,13 +68,41 @@ class ArchiveBox(commands.Cog):
             return f"{base_url.rstrip('/')}/{archive_path}"
         return base_url
 
+    def _build_screenshot_url(self, base_url: str, snapshot: dict) -> str | None:
+        """Build the screenshot URL for a snapshot."""
+        snapshot_id = snapshot.get("id")
+        if snapshot_id:
+            return f"{base_url.rstrip('/')}/snapshot/{snapshot_id}/screenshot/screenshot.png"
+        return None
+
+    async def _check_url_exists(self, session: aiohttp.ClientSession, url: str) -> bool:
+        """Check if a URL returns HTTP 200 via HEAD request."""
+        try:
+            async with session.head(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
+
+    def _build_archive_view(self, base_url: str, snapshot: dict, screenshot_url: str | None = None) -> discord.ui.View:
+        """Build a View with link buttons for the snapshot."""
+        view = discord.ui.View()
+
+        archive_link = self._build_archive_link(base_url, snapshot)
+        view.add_item(discord.ui.Button(label="View Snapshot", url=archive_link, emoji="🌐"))
+
+        if screenshot_url:
+            view.add_item(discord.ui.Button(label="Screenshot", url=screenshot_url, emoji="📸"))
+
+        return view
+
     def _build_success_embed(
         self,
         snapshot: dict,
         base_url: str,
         original_url: str,
         *,
-        already_archived: bool = False
+        already_archived: bool = False,
+        image_url: str | None = None
     ) -> discord.Embed:
         """Build the embed shown when a snapshot is ready."""
         archive_link = self._build_archive_link(base_url, snapshot)
@@ -102,6 +130,8 @@ class ArchiveBox(commands.Cog):
         embed.add_field(name="Title", value=title[:1024] if title else "N/A", inline=False)
         if tags:
             embed.add_field(name="Tags", value=tags[:1024], inline=False)
+        if image_url:
+            embed.set_image(url=image_url)
         embed.set_footer(text=f"Status: {status.capitalize()}")
         return embed
 
@@ -268,8 +298,15 @@ class ArchiveBox(commands.Cog):
         async with aiohttp.ClientSession() as session:
             existing = await self._find_snapshot(session, api_key, base_url, url)
             if existing:
-                embed = self._build_success_embed(existing, base_url, url, already_archived=True)
-                await pending_msg.edit(embed=embed)
+                screenshot_url = self._build_screenshot_url(base_url, existing)
+                has_screenshot = await self._check_url_exists(session, screenshot_url) if screenshot_url else False
+                embed = self._build_success_embed(
+                    existing, base_url, url,
+                    already_archived=True,
+                    image_url=screenshot_url if has_screenshot else None
+                )
+                view = self._build_archive_view(base_url, existing, screenshot_url if has_screenshot else None)
+                await pending_msg.edit(embed=embed, view=view)
                 return
 
             await pending_msg.edit(embed=discord.Embed(
@@ -361,8 +398,14 @@ class ArchiveBox(commands.Cog):
                     break
 
             if snapshot and snapshot.get("timestamp") and self._status_ok(snapshot.get("status")):
-                embed = self._build_success_embed(snapshot, base_url, url)
-                await pending_msg.edit(embed=embed)
+                screenshot_url = self._build_screenshot_url(base_url, snapshot)
+                has_screenshot = await self._check_url_exists(session, screenshot_url) if screenshot_url else False
+                embed = self._build_success_embed(
+                    snapshot, base_url, url,
+                    image_url=screenshot_url if has_screenshot else None
+                )
+                view = self._build_archive_view(base_url, snapshot, screenshot_url if has_screenshot else None)
+                await pending_msg.edit(embed=embed, view=view)
                 return
 
             snapshot = await self._poll_for_snapshot(
@@ -370,8 +413,14 @@ class ArchiveBox(commands.Cog):
             )
 
             if snapshot:
-                embed = self._build_success_embed(snapshot, base_url, url)
-                await pending_msg.edit(embed=embed)
+                screenshot_url = self._build_screenshot_url(base_url, snapshot)
+                has_screenshot = await self._check_url_exists(session, screenshot_url) if screenshot_url else False
+                embed = self._build_success_embed(
+                    snapshot, base_url, url,
+                    image_url=screenshot_url if has_screenshot else None
+                )
+                view = self._build_archive_view(base_url, snapshot, screenshot_url if has_screenshot else None)
+                await pending_msg.edit(embed=embed, view=view)
                 return
 
             embed = discord.Embed(
@@ -516,8 +565,15 @@ class ArchiveBox(commands.Cog):
         async with aiohttp.ClientSession() as session:
             existing = await self._find_snapshot(session, api_key, base_url, url)
             if existing:
-                embed = self._build_success_embed(existing, base_url, url, already_archived=True)
-                return await interaction.edit_original_response(embed=embed)
+                screenshot_url = self._build_screenshot_url(base_url, existing)
+                has_screenshot = await self._check_url_exists(session, screenshot_url) if screenshot_url else False
+                embed = self._build_success_embed(
+                    existing, base_url, url,
+                    already_archived=True,
+                    image_url=screenshot_url if has_screenshot else None
+                )
+                view = self._build_archive_view(base_url, existing, screenshot_url if has_screenshot else None)
+                return await interaction.edit_original_response(embed=embed, view=view)
 
             endpoint = f"{base_url.rstrip('/')}/api/v1/cli/add"
             payload = {"urls": [url], "depth": 0, "max_urls": 0}
@@ -594,16 +650,28 @@ class ArchiveBox(commands.Cog):
                     break
 
             if snapshot and snapshot.get("timestamp") and self._status_ok(snapshot.get("status")):
-                embed = self._build_success_embed(snapshot, base_url, url)
-                return await interaction.edit_original_response(embed=embed)
+                screenshot_url = self._build_screenshot_url(base_url, snapshot)
+                has_screenshot = await self._check_url_exists(session, screenshot_url) if screenshot_url else False
+                embed = self._build_success_embed(
+                    snapshot, base_url, url,
+                    image_url=screenshot_url if has_screenshot else None
+                )
+                view = self._build_archive_view(base_url, snapshot, screenshot_url if has_screenshot else None)
+                return await interaction.edit_original_response(embed=embed, view=view)
 
             snapshot = await self._slash_poll_for_snapshot(
                 session, api_key, base_url, url, interaction
             )
 
             if snapshot:
-                embed = self._build_success_embed(snapshot, base_url, url)
-                return await interaction.edit_original_response(embed=embed)
+                screenshot_url = self._build_screenshot_url(base_url, snapshot)
+                has_screenshot = await self._check_url_exists(session, screenshot_url) if screenshot_url else False
+                embed = self._build_success_embed(
+                    snapshot, base_url, url,
+                    image_url=screenshot_url if has_screenshot else None
+                )
+                view = self._build_archive_view(base_url, snapshot, screenshot_url if has_screenshot else None)
+                return await interaction.edit_original_response(embed=embed, view=view)
 
             embed = discord.Embed(
                 title="📦 Queued for Archiving",
