@@ -21,33 +21,6 @@ class ArchiveBox(commands.Cog):
 
         self.config.register_global(**default_global)
 
-        # ── Slash commands ──
-        self.slash_archive = app_commands.Command(
-            name="archive",
-            description="Submit a URL to ArchiveBox for archiving",
-            callback=self._slash_archive_callback,
-            guild_only=True,
-        )
-        self.slash_archive.default_permissions = discord.Permissions(manage_messages=True)
-
-        self.slash_status = app_commands.Command(
-            name="archivestatus",
-            description="Check if ArchiveBox is online and the API key is valid",
-            callback=self._slash_status_callback,
-            guild_only=True,
-        )
-        self.slash_status.default_permissions = discord.Permissions(manage_messages=True)
-
-    async def cog_load(self):
-        """Register app commands when the cog loads."""
-        self.bot.tree.add_command(self.slash_archive)
-        self.bot.tree.add_command(self.slash_status)
-
-    async def cog_unload(self):
-        """Unregister app commands when the cog unloads."""
-        self.bot.tree.remove_command(self.slash_archive.name, type=discord.AppCommandType.chat_input)
-        self.bot.tree.remove_command(self.slash_status.name, type=discord.AppCommandType.chat_input)
-
     # ── Helpers ──
 
     async def _get_api_key(self) -> str | None:
@@ -264,17 +237,7 @@ class ArchiveBox(commands.Cog):
     @commands.command(name="archive")
     @commands.mod_or_permissions(manage_messages=True)
     async def archive(self, ctx: commands.Context, url: str):
-        """Submit a URL to ArchiveBox for archiving.
-
-        If the URL has already been archived, the existing snapshot is returned
-        instead of creating a duplicate.
-
-        **Usage:**
-        `[p]archive https://example.com`
-        `[p]archive <https://example.com>`
-
-        The bot owner must configure an API key first with `[p]set api archivebox api_key,<key>`.
-        """
+        """Submit a URL to ArchiveBox for archiving."""
         api_key = await self._get_api_key()
         base_url = await self.config.base_url()
 
@@ -518,7 +481,11 @@ class ArchiveBox(commands.Cog):
 
     # ── Slash commands ──
 
-    async def _slash_archive_callback(self, interaction: discord.Interaction, url: str):
+    @app_commands.command(name="archive", description="Submit a URL to ArchiveBox for archiving")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_messages=True)
+    @app_commands.describe(url="The URL to archive")
+    async def slash_archive(self, interaction: discord.Interaction, url: str):
         """Slash command: submit a URL to ArchiveBox."""
         api_key = await self._get_api_key()
         base_url = await self.config.base_url()
@@ -548,13 +515,11 @@ class ArchiveBox(commands.Cog):
         await interaction.response.defer(thinking=True)
 
         async with aiohttp.ClientSession() as session:
-            # Check existing
             existing = await self._find_snapshot(session, api_key, base_url, url)
             if existing:
                 embed = self._build_success_embed(existing, base_url, url, already_archived=True)
                 return await interaction.edit_original_response(embed=embed)
 
-            # Submit
             endpoint = f"{base_url.rstrip('/')}/api/v1/cli/add"
             payload = {"urls": [url], "depth": 0, "max_urls": 0}
 
@@ -623,7 +588,6 @@ class ArchiveBox(commands.Cog):
                     color=discord.Color.red()
                 ))
 
-            # Parse immediate response
             snapshot = None
             for snap in self._extract_items(data):
                 if isinstance(snap, dict):
@@ -634,7 +598,6 @@ class ArchiveBox(commands.Cog):
                 embed = self._build_success_embed(snapshot, base_url, url)
                 return await interaction.edit_original_response(embed=embed)
 
-            # Poll
             snapshot = await self._slash_poll_for_snapshot(
                 session, api_key, base_url, url, interaction
             )
@@ -643,7 +606,6 @@ class ArchiveBox(commands.Cog):
                 embed = self._build_success_embed(snapshot, base_url, url)
                 return await interaction.edit_original_response(embed=embed)
 
-            # Timed out
             embed = discord.Embed(
                 title="📦 Queued for Archiving",
                 description=(
@@ -658,7 +620,10 @@ class ArchiveBox(commands.Cog):
             embed.add_field(name="Original URL", value=url[:1024], inline=False)
             await interaction.edit_original_response(embed=embed)
 
-    async def _slash_status_callback(self, interaction: discord.Interaction):
+    @app_commands.command(name="archivestatus", description="Check if ArchiveBox is online and the API key is valid")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_messages=True)
+    async def slash_archivestatus(self, interaction: discord.Interaction):
         """Slash command: check ArchiveBox status."""
         api_key = await self._get_api_key()
         base_url = await self.config.base_url()

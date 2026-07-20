@@ -1,6 +1,6 @@
 {
     "author": ["Red Cogs"],
-    "install_msg": "Thanks for installing NicknameTracker! Use `[p]nicktrack @User` or `/nicktrack history` to view nickname history. Tracking is enabled by default.",
+    "install_msg": "Thanks for installing NicknameTracker! Use `[p]nicktrack @User` to view nickname history. Use `[p]slash enablecog nicktracker` and `[p]slash sync` to enable slash commands.",
     "name": "NicknameTracker",
     "short": "Track nickname changes in your server",
     "description": "Logs every nickname change per user with timestamps. Supports prefix commands and slash commands. Tracks joins, leaves, and rejoins. History is capped at 50 entries per user and persists across bot restarts.",

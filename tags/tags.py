@@ -10,6 +10,13 @@ from redbot.core.utils.chat_formatting import pagify
 class Tags(commands.Cog):
     """Create and manage custom command tags for your server."""
 
+    # ── Slash command group ──
+    tag_group = app_commands.Group(
+        name="tag",
+        description="Manage custom server tags",
+        guild_only=True,
+    )
+
     def __init__(self, bot: Red):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1928374650, force_registration=True)
@@ -19,54 +26,6 @@ class Tags(commands.Cog):
         }
 
         self.config.register_guild(**default_guild)
-
-        # ── Slash command group ──
-        self.slash_tag = app_commands.Group(
-            name="tag",
-            description="Manage custom server tags",
-            guild_only=True,
-        )
-        self.slash_tag.add_command(app_commands.Command(
-            name="run",
-            description="Run a tag",
-            callback=self._slash_tag_run
-        ))
-        self.slash_tag.add_command(app_commands.Command(
-            name="add",
-            description="Create a new tag",
-            callback=self._slash_tag_add
-        ))
-        self.slash_tag.add_command(app_commands.Command(
-            name="remove",
-            description="Delete a tag",
-            callback=self._slash_tag_remove
-        ))
-        self.slash_tag.add_command(app_commands.Command(
-            name="list",
-            description="List all tags in this server",
-            callback=self._slash_tag_list
-        ))
-        self.slash_tag.add_command(app_commands.Command(
-            name="info",
-            description="Show info about a tag",
-            callback=self._slash_tag_info
-        ))
-        self.slash_tag.add_command(app_commands.Command(
-            name="edit",
-            description="Edit an existing tag",
-            callback=self._slash_tag_edit
-        ))
-        self.slash_tag.add_command(app_commands.Command(
-            name="raw",
-            description="Show raw tag content",
-            callback=self._slash_tag_raw
-        ))
-
-    async def cog_load(self):
-        self.bot.tree.add_command(self.slash_tag)
-
-    async def cog_unload(self):
-        self.bot.tree.remove_command(self.slash_tag.name, type=discord.AppCommandType.chat_input)
 
     # ── Helpers ──
 
@@ -304,9 +263,12 @@ class Tags(commands.Cog):
             color=color
         )
 
-    # ── Slash commands ──
+    # ── Slash commands (grouped under /tag) ──
 
-    async def _slash_tag_run(self, interaction: discord.Interaction, name: str):
+    @tag_group.command(name="run", description="Run a tag")
+    @app_commands.describe(name="The name of the tag to run")
+    async def slash_tag_run(self, interaction: discord.Interaction, name: str):
+        """Slash command: run a tag."""
         tags = await self.config.guild(interaction.guild).tags()
         tag_data = tags.get(name.lower())
 
@@ -321,15 +283,23 @@ class Tags(commands.Cog):
         content = self._substitute_variables_interaction(tag_data["content"], interaction)
         await interaction.response.send_message(content)
 
-    async def _slash_tag_add(self, interaction: discord.Interaction, name: str, content: str):
+    @tag_group.command(name="add", description="Create a new tag")
+    @app_commands.describe(name="The tag name", content="The tag content")
+    async def slash_tag_add(self, interaction: discord.Interaction, name: str, content: str):
+        """Slash command: create a tag."""
         result = await self._create_tag(interaction.guild, interaction.user, name, content)
         await interaction.response.send_message(result, ephemeral=result.startswith("❌"))
 
-    async def _slash_tag_remove(self, interaction: discord.Interaction, name: str):
+    @tag_group.command(name="remove", description="Delete a tag")
+    @app_commands.describe(name="The tag name to delete")
+    async def slash_tag_remove(self, interaction: discord.Interaction, name: str):
+        """Slash command: delete a tag."""
         result = await self._delete_tag(interaction.guild, interaction.user, name)
         await interaction.response.send_message(result, ephemeral=result.startswith("❌"))
 
-    async def _slash_tag_list(self, interaction: discord.Interaction):
+    @tag_group.command(name="list", description="List all tags in this server")
+    async def slash_tag_list(self, interaction: discord.Interaction):
+        """Slash command: list tags."""
         embeds = await self._build_tag_list_embeds(interaction.guild, await self.bot.get_embed_color(interaction.guild))
         if not embeds:
             return await interaction.response.send_message("There are no tags in this server.", ephemeral=True)
@@ -337,18 +307,27 @@ class Tags(commands.Cog):
         for embed in embeds[1:]:
             await interaction.followup.send(embed=embed)
 
-    async def _slash_tag_info(self, interaction: discord.Interaction, name: str):
+    @tag_group.command(name="info", description="Show info about a tag")
+    @app_commands.describe(name="The tag name")
+    async def slash_tag_info(self, interaction: discord.Interaction, name: str):
+        """Slash command: tag info."""
         embed = await self._build_tag_info_embed(interaction.guild, name, await self.bot.get_embed_color(interaction.guild))
         if embed:
             await interaction.response.send_message(embed=embed)
         else:
             await interaction.response.send_message(f"❌ Tag `{name}` doesn't exist.", ephemeral=True)
 
-    async def _slash_tag_edit(self, interaction: discord.Interaction, name: str, new_content: str):
+    @tag_group.command(name="edit", description="Edit an existing tag")
+    @app_commands.describe(name="The tag name", new_content="The new content")
+    async def slash_tag_edit(self, interaction: discord.Interaction, name: str, new_content: str):
+        """Slash command: edit a tag."""
         result = await self._edit_tag(interaction.guild, interaction.user, name, new_content)
         await interaction.response.send_message(result, ephemeral=result.startswith("❌"))
 
-    async def _slash_tag_raw(self, interaction: discord.Interaction, name: str):
+    @tag_group.command(name="raw", description="Show raw tag content")
+    @app_commands.describe(name="The tag name")
+    async def slash_tag_raw(self, interaction: discord.Interaction, name: str):
+        """Slash command: raw tag content."""
         embed = await self._build_tag_raw_embed(interaction.guild, name, await self.bot.get_embed_color(interaction.guild))
         if embed:
             await interaction.response.send_message(embed=embed)

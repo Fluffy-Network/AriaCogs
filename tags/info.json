@@ -1,6 +1,6 @@
 {
     "author": ["Red Cogs"],
-    "install_msg": "Thanks for installing Tags! Create your first tag with `[p]tag add <name> <content>` or `/tag add`. Both prefix and slash commands are supported!",
+    "install_msg": "Thanks for installing Tags! Create your first tag with `[p]tag add <name> <content>`. Use `[p]slash enablecog tags` and `[p]slash sync` to enable slash commands.",
     "name": "Tags",
     "short": "Custom command tags for your server",
     "description": "Create, edit, and manage custom text tags that act like server-specific commands. Supports prefix commands, slash commands, and variables like {user}, {guild}, {date}, etc.",

@@ -1,6 +1,7 @@
 import discord
 from discord import app_commands
 from datetime import datetime
+from typing import Optional
 
 from redbot.core import commands, Config
 from redbot.core.bot import Red
@@ -9,6 +10,13 @@ from redbot.core.utils.chat_formatting import pagify
 
 class NicknameTracker(commands.Cog):
     """Track nickname changes in your server."""
+
+    # ── Slash command group ──
+    nicktrack_group = app_commands.Group(
+        name="nicktrack",
+        description="Track and view nickname changes",
+        guild_only=True,
+    )
 
     def __init__(self, bot: Red):
         self.bot = bot
@@ -20,44 +28,6 @@ class NicknameTracker(commands.Cog):
         }
 
         self.config.register_guild(**default_guild)
-
-        # ── Slash command group ──
-        self.slash_nicktrack = app_commands.Group(
-            name="nicktrack",
-            description="Track and view nickname changes",
-            guild_only=True,
-        )
-        self.slash_nicktrack.add_command(app_commands.Command(
-            name="history",
-            description="View nickname history for a user",
-            callback=self._slash_nicktrack_history
-        ))
-        self.slash_nicktrack.add_command(app_commands.Command(
-            name="enable",
-            description="Enable nickname tracking",
-            callback=self._slash_nicktrack_enable
-        ))
-        self.slash_nicktrack.add_command(app_commands.Command(
-            name="disable",
-            description="Disable nickname tracking",
-            callback=self._slash_nicktrack_disable
-        ))
-        self.slash_nicktrack.add_command(app_commands.Command(
-            name="clear",
-            description="Clear nickname history for a user",
-            callback=self._slash_nicktrack_clear
-        ))
-        self.slash_nicktrack.add_command(app_commands.Command(
-            name="wipe",
-            description="Wipe ALL nickname history in this server",
-            callback=self._slash_nicktrack_wipe
-        ))
-
-    async def cog_load(self):
-        self.bot.tree.add_command(self.slash_nicktrack)
-
-    async def cog_unload(self):
-        self.bot.tree.remove_command(self.slash_nicktrack.name, type=discord.AppCommandType.chat_input)
 
     # ── Event Listeners ──
 
@@ -231,9 +201,12 @@ class NicknameTracker(commands.Cog):
         await self.config.guild(ctx.guild).nicknames.set({})
         await ctx.send("✅ All nickname history has been wiped.")
 
-    # ── Slash commands ──
+    # ── Slash commands (grouped under /nicktrack) ──
 
-    async def _slash_nicktrack_history(self, interaction: discord.Interaction, user: discord.Member | None = None):
+    @nicktrack_group.command(name="history", description="View nickname change history for a user")
+    @app_commands.describe(user="The user to look up (defaults to yourself)")
+    async def slash_nicktrack_history(self, interaction: discord.Interaction, user: Optional[discord.Member] = None):
+        """Slash command: view nickname history."""
         if user is None:
             user = interaction.user
 
@@ -248,7 +221,9 @@ class NicknameTracker(commands.Cog):
         for embed in embeds[1:]:
             await interaction.followup.send(embed=embed)
 
-    async def _slash_nicktrack_enable(self, interaction: discord.Interaction):
+    @nicktrack_group.command(name="enable", description="Enable nickname tracking in this server")
+    async def slash_nicktrack_enable(self, interaction: discord.Interaction):
+        """Slash command: enable tracking."""
         if not interaction.user.guild_permissions.manage_guild:
             return await interaction.response.send_message(
                 "❌ You need **Manage Server** permission to do that.", ephemeral=True
@@ -256,7 +231,9 @@ class NicknameTracker(commands.Cog):
         await self.config.guild(interaction.guild).tracking_enabled.set(True)
         await interaction.response.send_message("✅ Nickname tracking has been **enabled**.")
 
-    async def _slash_nicktrack_disable(self, interaction: discord.Interaction):
+    @nicktrack_group.command(name="disable", description="Disable nickname tracking in this server")
+    async def slash_nicktrack_disable(self, interaction: discord.Interaction):
+        """Slash command: disable tracking."""
         if not interaction.user.guild_permissions.manage_guild:
             return await interaction.response.send_message(
                 "❌ You need **Manage Server** permission to do that.", ephemeral=True
@@ -264,7 +241,10 @@ class NicknameTracker(commands.Cog):
         await self.config.guild(interaction.guild).tracking_enabled.set(False)
         await interaction.response.send_message("✅ Nickname tracking has been **disabled**.")
 
-    async def _slash_nicktrack_clear(self, interaction: discord.Interaction, user: discord.Member):
+    @nicktrack_group.command(name="clear", description="Clear nickname history for a user")
+    @app_commands.describe(user="The user whose history to clear")
+    async def slash_nicktrack_clear(self, interaction: discord.Interaction, user: discord.Member):
+        """Slash command: clear one user's history."""
         if not interaction.user.guild_permissions.manage_guild:
             return await interaction.response.send_message(
                 "❌ You need **Manage Server** permission to do that.", ephemeral=True
@@ -274,7 +254,9 @@ class NicknameTracker(commands.Cog):
                 del nicknames[str(user.id)]
         await interaction.response.send_message(f"✅ Cleared nickname history for {user.mention}.")
 
-    async def _slash_nicktrack_wipe(self, interaction: discord.Interaction):
+    @nicktrack_group.command(name="wipe", description="Wipe ALL nickname history in this server")
+    async def slash_nicktrack_wipe(self, interaction: discord.Interaction):
+        """Slash command: wipe all history."""
         if not interaction.user.guild_permissions.manage_guild:
             return await interaction.response.send_message(
                 "❌ You need **Manage Server** permission to do that.", ephemeral=True
