@@ -482,7 +482,6 @@ class ArchiveBox(commands.Cog):
     # ── Slash commands ──
 
     @app_commands.command(name="archive", description="Submit a URL to ArchiveBox for archiving")
-    @app_commands.guild_only()
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.describe(url="The URL to archive")
     async def slash_archive(self, interaction: discord.Interaction, url: str):
@@ -621,7 +620,6 @@ class ArchiveBox(commands.Cog):
             await interaction.edit_original_response(embed=embed)
 
     @app_commands.command(name="archivestatus", description="Check if ArchiveBox is online and the API key is valid")
-    @app_commands.guild_only()
     @app_commands.default_permissions(manage_messages=True)
     async def slash_archivestatus(self, interaction: discord.Interaction):
         """Slash command: check ArchiveBox status."""
