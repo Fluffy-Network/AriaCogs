@@ -1,0 +1,15 @@
+{
+    "author": ["Red Cogs"],
+    "install_msg": "Thanks for installing Reminders! Set your first reminder with `[p]remind 2h Check the oven`.",
+    "name": "Reminders",
+    "short": "Personal reminders with flexible time parsing",
+    "description": "Set personal reminders that DM you or ping you in a channel. Supports relative times (2h, 30m), absolute times (14:00), specific dates, and recurring reminders (daily, weekly, monthly).",
+    "tags": ["utility", "reminders", "timer", "productivity"],
+    "requirements": [],
+    "hidden": false,
+    "disabled": false,
+    "min_bot_version": "3.5.0",
+    "max_bot_version": "0.0.0",
+    "min_python_version": [3, 9, 0],
+    "end_user_data_statement": "This cog stores reminder content, target times, and channel/guild IDs per user. No personal data is shared with third parties."
+}
